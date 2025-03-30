@@ -16,7 +16,9 @@ display info values for range do not exactly match the final point coordinates w
 
 dont forget about vertical lines
 there is a unknown random value being appended to origins at the end of motions with bounce, too tired to deal with it rn and its not bothering me
-i need to find a way to change how finalpoint is calculted cos when its at 0 it says -0.03m which is just tragic to look at
+hovering over points that touch the floor display a y distance as -0.0 how awesome 🤩🤩
+when showtrail is off the point lies at the last origin instead of the final point at the end of a motion
+it still randomly does the thing where it hits something and it just stops - my theory is cos it hits it and its a vert wall so i need to code the new state,
 '''
 
 
@@ -25,6 +27,7 @@ wh = pygame.display.get_desktop_sizes()[0]
 height = wh[1]
 width = wh[0]
 screen = pygame.display.set_mode((width, height), pygame.FULLSCREEN)
+
 clock = pygame.time.Clock()
 running = True
 
@@ -47,17 +50,17 @@ e = 1/2 #value for restitution, denoted with e in applied maths
 displayRestitution = ('1/2') #string of value for e for 
 
 def time(init): #gets the time of a single motion
-    return ((init[1])) / (4.9)
+    return (init[1]) / (4.9)
 
 def xrange(init): #horizontal distance covered in a motion
     mag = math.sqrt((init[0])**2+(init[1])**2) #magnitude of velocity
-    theta = math.degrees(math.atan(init[1]/init[0])) #angle particle is projected at
-    return ( (mag**2) * (math.sin(2*math.radians(theta))) ) / g
+    theta = math.atan(init[1]/init[0]) #angle particle is projected at in radians
+    return ( (mag**2) * (math.sin(2*theta)) ) / g
 
 def maxheight(init): #maximum height reached in a single motion
     mag = math.sqrt((init[0])**2+(init[1])**2) #magnitude of velocity
-    theta = math.degrees(math.atan(init[1]/init[0])) #angle particle is projected at
-    return ( (mag**2) * (math.sin(math.radians(theta)))*(math.sin(math.radians(theta))) ) / (2*g)
+    theta = math.atan(init[1]/init[0]) #angle particle is projected at in radians
+    return ( (mag**2) * (math.sin(theta))*(math.sin(theta)) ) / (2*g)
 
 ###declaring all the images and their required states/rects
 FireButtonStates = [pygame.image.load('Images/Fire!.png').convert_alpha(),
@@ -154,6 +157,7 @@ initials = [initial] #list of initials
 ranges = [] #list of each range of seperate motion
 rawranges = [] #list of each range of seperate motion in cartesian form
 RawRangeOutliers = {}
+CollisionOriginPoints = {}
 
 
 totalT = 0 #total time of the current motion
@@ -186,7 +190,7 @@ class Motion:
         deltaTime = deltaTime/1000
         x = (self.initialx*deltaTime)
         y = (self.initialy*deltaTime) - (self.gravity/2)*(deltaTime**2)
-        return [(x,y), self.range, self.motionNo]
+        return [(x,y), self.motionNo]
 
 def hover(p, dp): #function to take in the real position of a point and its position relative to the origin and the motion, then render those in a font to be displayed when hovering over them
     return (font.render(str((round(dp[0]/scale,2),round(dp[1]/scale,2)))+'m', True,(68,71,187)), p)
@@ -265,26 +269,31 @@ class Line:
 
 
     def collisionCheck(self, Coefficients, origin): #coefficients of current motion.
-        # if self.slope == ('inf'):
-        '''the test line would ba x=13{3<y<9} now make an equasion hat gets intersectionyvalues and checks the range of them, or maybe check if x=13 is present in parabola and then check is f(13) inside the y range'''
-        intersectionXValues = QuadraticSolver(Coefficients[0], Coefficients[1] - self.slope, Coefficients[2] - self.yIntercept)
-        Restriction = sorted([self.pointA[0],self.pointB[0]])
-        
-        if type(intersectionXValues) == list:
-            intersectionXValues_valid = []
-            for xVal in intersectionXValues:
-                if xVal >= Restriction[0] and xVal <= Restriction[1]:
-                    intersectionXValues_valid.append(xVal)
-
-            for xVal in intersectionXValues_valid:
-                if ToleranceCheck(origin[0], xVal):
-                    return xVal
-
-        elif type(intersectionXValues) == float:
-            if intersectionXValues >= Restriction[0] and intersectionXValues <= Restriction[1]:
-                return intersectionXValues
+        if self.slope == float('inf'):
+            xVal = self.pointA[0]
+            yVal = Coefficients[0]*(xVal**2) + Coefficients[1]*xVal + Coefficients[2]
+            Restriction = sorted([self.pointA[1],self.pointB[1]])
+            if yVal >= Restriction[0] and yVal <= Restriction[1]:
+                return xVal
         else:
-            return False
+            intersectionXValues = QuadraticSolver(Coefficients[0], Coefficients[1] - self.slope, Coefficients[2] - self.yIntercept)
+            Restriction = sorted([self.pointA[0],self.pointB[0]])
+            
+            if type(intersectionXValues) == list:
+                intersectionXValues_valid = []
+                for xVal in intersectionXValues:
+                    if xVal >= Restriction[0] and xVal <= Restriction[1]:
+                        intersectionXValues_valid.append(xVal)
+
+                for xVal in intersectionXValues_valid:
+                    if ToleranceCheck(origin[0], xVal):
+                        return xVal
+
+            elif type(intersectionXValues) == float:
+                if intersectionXValues >= Restriction[0] and intersectionXValues <= Restriction[1]:
+                    return intersectionXValues
+            else:
+                return False
     
     def YValueFromXValue(self, X):
         return (self.slope*(X-self.pointA[0]) + self.pointA[1])
@@ -302,10 +311,8 @@ Line( (13,3), (13,9))
 # def YValueFromX(initial): 
 #     return ((initial[1]*X)/initial[0]) + (-g/2)*((X**2)/(initial[0]**2))
 
+#function will return coeffs of quadratic equation in the form of ax2+bx+c, they should all be cartesian form
 def threepointparabola(x1,y1,x2,y2,x3,y3):
-    #they should all be cartesian form
-    #function will return coeffs of quadratic equation in the form of ax2+bx+c
-    # print(x1,y1,x2,y2,x3,y3)
     a = ( ((x3-x2)*(y2-y1)) - ((x2-x1)*(y3-y2)) ) / ( ((x3-x2)*(x2**2-x1**2)) - ((x2-x1)*(x3**2-x2**2)) )
     
     b = ( (y2-y1)-a*(x2**2-x1**2) ) / (x2-x1)
@@ -318,7 +325,7 @@ def threepointparabola(x1,y1,x2,y2,x3,y3):
     return [a,b,c]
 
 def pixelToCart(p, CurrentXshift, CurrentYshift, CurrentScale):
-    p = ( (p[0] - origin[0] + CurrentXshift)/CurrentScale, (origin[1] - p[1] - CurrentYshift)/CurrentScale )
+    p = ( (p[0] - origin[0] + CurrentXshift)/CurrentScale, (origin[1] - p[1] - CurrentYshift)/CurrentScale ) #I CHANGED THE - CURRENTYSHIFT TO + CURRENTYSHIFT SO TERRFIFIED IT AFFECTED A BUNCH IDK THOO
     return p
 
 def xrangeGivenOrigin(init, currentOrigin):
@@ -330,16 +337,7 @@ def xrangeGivenOrigin(init, currentOrigin):
     return (init[0]*posTVal)
 
 
-teststring = ''
 
-NextLineIndex = False
-CollisionOriginPoints = {}
-CollisionRawRanges = {}
-RawRangeOutliers = {}
-debugdots = []
-NextCollisionXPoint = ''
-CollidingPoints = []
-rawranges = []
 while running:
     pygame.event.post(scaleshiftevent) #calls the event that shifts all coordinates to the current scale
     if not inputting:
@@ -381,7 +379,7 @@ while running:
     
     testText = font.render(str([round(x) for x in rawranges]), True, (255,255,255))
     slopeslist = [math.degrees(x.angle) for x in linesList]
-    testText = debugfont.render((f'{incomingCollision} {Neworigins}'), True, (255,255,255))
+    testText = debugfont.render((f'{incomingCollision} {RawRangeOutliers}'), True, (255,255,255))
 
 
     for event in pygame.event.get():
@@ -432,7 +430,10 @@ while running:
                 rawranges = []
                 CollisionOriginPoints = {}
                 RawRangeOutliers = {}
+                incomingCollision = False
                 linesList = []
+                CollidingPoints = []
+
 
                 
             if ShowTrailButton_rect.collidepoint(event.pos):
@@ -610,7 +611,6 @@ while running:
                 if i == 0:
                     Neworigins.append((r,0))
                 else:
-                    
                     Neworigins.append((Neworigins[i-1][0]+r,0))
 
 
@@ -624,37 +624,27 @@ while running:
                     rawmaxpointsx.append(sum(rawranges[:i])+rawranges[i]/2) #any maxheight after this will be the sum of the ranges up to the origin just before this maximum point. then adding half of the current range/2 to get in the middle.
             maxpointsx = [scale*xdistance for xdistance in rawmaxpointsx]
 
-
             Neworigins.insert(0,(0,0))
             if CollisionOriginPoints:
                 for i, o in CollisionOriginPoints.items():
                     Neworigins[i] = (scale*o[0],scale*o[1])
             
-            
-
             Neworigins = [ ( (o[0]+(width/8), (height*7/8)-o[1]) ) for o in Neworigins]
 
             if incomingCollision:
                 currentOriginCartForm = pixelToCart(Neworigins[bounceCount],xshift,yshift,scale)
                 RawRangeOutliers[bounceCount] = NextCollisionXPoint - currentOriginCartForm[0]
-                # print(f'RawRangeOutliers[{bounceCount}] = {RawRangeOutliers[bounceCount]}, because {NextCollisionXPoint} - {currentOriginCartForm[0]}, {Neworigins[bounceCount+1]}')
+                print(f'I append this to raw range outliers cos im a fucking stupid computer {RawRangeOutliers}')
                 CollisionOriginPoints[bounceCount+1] = (NextCollisionXPoint, NextCollisionYPoint)
             
 
             maxpoints = [(scale*xrange(init)/2 + Neworigins[i][0] - xshift, Neworigins[i][1] - scale*maxheight(init)- yshift) for i,init in enumerate(initials)] #updates list of maxheights for every initial
 
-            #Creating rects for all of these vital points so they can have hover detection to know if their coordinates should be displayed or not
-            # points_rects = []
-            # for i in range(len(maxpointsx)):
-            #     temprect = pygame.Rect(0,0,10,10)
-            #     temprect.center = (width/8 + maxpointsx[i] - xshift,height*7/8 - maxheights[i] - yshift)
-            #     points_rects.append(temprect)
             points_rects = []
             for i in range(len(maxpoints)):
                 temprect = pygame.Rect(0,0,10,10)
                 temprect.center = maxpoints[i]
                 points_rects.append(temprect)
-
 
             originpoints_rects = []
             for i in range(len(Neworigins)):
@@ -669,9 +659,8 @@ while running:
             else:
                 temprect.center = (origin[0] + sum(ranges) - xshift, origin[1] - yshift)#im too lazy to correct this rn so do it pretty please 🥺
                 finalpoint_rect = temprect
-
             
-            path = [[(scale*p[0][0],scale*p[0][1]),(p[1]), p[2]] for i,p in enumerate(rawpath)] #this is taken from the getpoint function in the motion class,the points are multiplied by the scale as it can be constantly changed index 1 is unused can be ignored. index 2 is the motion number label. not scale dependant but used so when drawing each circle it knows what origin it is relative to as there is a list of origins
+            path = [[(scale*p[0][0],scale*p[0][1]), p[1]] for p in rawpath] #this is taken from the getpoint function in the motion class,the points are multiplied by the scale as it can be constantly changed index 1 is unused can be ignored. index 2 is the motion number label. not scale dependant but used so when drawing each circle it knows what origin it is relative to as there is a list of origins
             
 #and simulating was in this
         if event.type == GetParabola and len(rawranges) != 0:
@@ -700,13 +689,13 @@ while running:
             # print(f'bounceCount {bounceCount}, {CollidingPoints}')
             CollidingPoints = sorted(CollidingPoints)
             if len(CollidingPoints) != 0:
-                # print('collision')
                 incomingCollision = True
                 NextCollisionXPoint = CollidingPoints[0]
                 pygame.time.set_timer(landing, round(timeToReachX(initial,NextCollisionXPoint,originCartForm)*1000), 1)
                 print(f'timer for {round(timeToReachX(initial,NextCollisionXPoint,originCartForm)*1000)} ms has begun, {initial} and {NextCollisionXPoint}')
-                NextCollisionYPoint = linesList[NextLineIndex].YValueFromXValue(NextCollisionXPoint)
-                # print('Hit Point', NextCollisionXPoint, NextCollisionYPoint)
+                # NextCollisionYPoint = linesList[NextLineIndex].YValueFromXValue(NextCollisionXPoint)
+                NextCollisionYPoint = Coeffs[0]*(NextCollisionXPoint**2) + Coeffs[1]*NextCollisionXPoint + Coeffs[2]
+                print('Hit Point', NextCollisionXPoint, NextCollisionYPoint)
             else:
                 incomingCollision = False
 
@@ -905,13 +894,11 @@ while running:
         if showtrail:
             for p in path[:-1]: #Filtering out latest point in list as it cannot be scaled fast enough
                 '''
-                p[2] is taken form the motion.getpoint(...) function, it is the motion Number.
+                p[1] is taken form the motion.getpoint(...) function, it is the motion Number.
                 It is used so I can index the origins list and it will correctly use the correct offset when iterating through the path,
                 as each point in the path has a origin assigned it it
                 '''
-                pygame.draw.circle(screen, 'white', (Neworigins[p[2]][0] + p[0][0] - xshift,Neworigins[p[2]][1] - p[0][1] - yshift), 3)
-                # pygame.draw.circle(screen, 'white', (Neworigins[p[2]][0] + p[0][0] - xshift,Neworigins[p[2]][1] - p[0][1] - yshift), 3)
-
+                pygame.draw.circle(screen, 'white', (Neworigins[p[1]][0] + p[0][0] - xshift,Neworigins[p[1]][1] - p[0][1] - yshift), 3)
             for i in range(len(ranges)): #iterates through ranges calculated. if the index is below the maxcount display all maxpoints. same for bounceCount and origins
                 if i < maxCount:
                     # pygame.draw.circle(screen, 'green', (width/8 + maxpointsx[i] - xshift, height*7/8 - maxheights[i] - yshift) , 5)
@@ -924,7 +911,7 @@ while running:
             if displayfinal:
                 pygame.draw.circle(screen, 'brown', finalpoint_rect.center, 5)
 
-        if not showtrail and totalT < (time(initial)*1000):
+        if not showtrail:
             '''
             if not showing trail, the entire path does not need to be kept track of, so I can just calculate the point at the exact current time,
             indexing origins with the bounceCount as the bounceCount cannot go down as I wouldnt need to render any past motions.
@@ -933,12 +920,8 @@ while running:
             pygame.draw.circle(screen, 'white', (Neworigins[bounceCount][0] + currentpos[0]*scale - xshift,Neworigins[bounceCount][1] - currentpos[1]*scale - yshift), 3)
             # pygame.draw.circle(screen, 'white', (Neworigins[bounceCount][0] +  currentpos[0]*scale - xshift,Neworigins[bounceCount][1] - currentpos[1]*scale - yshift), 3)
 
-
     pygame.draw.circle(screen, 'red', (origin[0]-xshift,origin[1]-yshift), 5) # True Origin
 
-        
-        
-    
     if not HideUI:
         #information boxes in top right
         screen.blit(BlankBox,baseBlankBox_rect)
@@ -984,29 +967,28 @@ while running:
                     if rect.collidepoint(pygame.mouse.get_pos()):
                         hoveringMax = True
                         if not hoveringOrigin:
-                            maxpoint_Cart = pixelToCart(points_rects[i],xshift,yshift,scale)
-                            maxpointText = font.render(f'({round(maxpoint_Cart[0],2)},{round(maxpoint_Cart[1],2)})m',True, (68,71,187))
+                            maxpoint_Cart = pixelToCart(rect.center,xshift,yshift,scale)
+                            maxpointText = font.render(f'({round(maxpoint_Cart[0],1)},{round(maxpoint_Cart[1],1)})m',True, (68,71,187))
                             screen.blit(maxpointText,(rect.center[0], rect.center[1]-45))
                     else:
                         hoveringMax = False
 
                         
-            for i,rect in enumerate(originpoints_rects[:-1]):
+            for i,rect in enumerate(originpoints_rects):
                 if i <= bounceCount: #so it only displays what the projectile has passed through
                     if rect.collidepoint(pygame.mouse.get_pos()):
                         hoveringOrigin = True
                         if not hoveringMax:
-                            originCartForm = pixelToCart(Neworigins[i],xshift,yshift,scale)
-                            originText = font.render(f'({round(originCartForm[0],2)},{round(originCartForm[1],2)})m', True, (68,71,187))
+                            originCartForm = pixelToCart(rect.center,xshift,yshift,scale)
+                            originText = font.render(f'({round(originCartForm[0],1)},{round(originCartForm[1],1)})m', True, (68,71,187))
                             screen.blit(originText,(rect.center[0], rect.center[1]-45))
                     else:
-                        hoveringOrigin = False
-
+                        hoveringOrigin = False        
 
             if displayfinal:
                 if finalpoint_rect.collidepoint(pygame.mouse.get_pos()):
                     finalpoint_Cart = pixelToCart(finalpoint_rect.center, xshift, yshift, scale)
-                    finalpointText = font.render(f'({round(finalpoint_Cart[0],2)},{round(finalpoint_Cart[1],2)})m', True, (68,71,187))
+                    finalpointText = font.render(f'({round(finalpoint_Cart[0],1)},{round(finalpoint_Cart[1],1)})m', True, (68,71,187))
 
                     finalpoint_rect.center = (finalpoint_rect.center[0], finalpoint_rect.center[1]-45)
                     screen.blit(finalpointText, finalpoint_rect)
