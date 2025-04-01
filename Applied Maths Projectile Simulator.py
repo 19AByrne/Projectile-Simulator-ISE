@@ -12,14 +12,7 @@ Countless tests on paper of the motions were performed by myself while coding th
 
 ##errors / to-do
 '''
-display info values for range do not exactly match the final point coordinates when displayed, possibly deltaTime issue. its also def incrorect now cos it can move in all sorts of directions
-
-dont forget about vertical lines
-there is a unknown random value being appended to origins at the end of motions with bounce, too tired to deal with it rn and its not bothering me
 hovering over points that touch the floor display a y distance as -0.0 how awesome 🤩🤩
-when showtrail is off the point lies at the last origin instead of the final point at the end of a motion
-it still randomly does the thing where it hits something and it just stops - my theory is cos it hits it and its a vert wall so i need to code the new state,
-timer for hitting the bottom of a line is incredibly wrong and it just goes through the gorund
 '''
 
 pygame.init()
@@ -161,7 +154,6 @@ rawranges = [] #list of each range of seperate motion in cartesian form
 RawRangeOutliers = {}
 CollisionOriginPoints = {}
 
-
 totalT = 0 #total time of the current motion
 displayTimeValue = 0 #true total time value of entire motion to be displayed to user in the top right
 bounceCount = 0
@@ -210,15 +202,10 @@ displayTime = font.render(f'{round(displayTimeValue/1000,1)}s', True, (255,255,2
 displayTime_rect = displayTime.get_rect()
 displayTime_rect.center = baseBlankBox_rect.center
 
-displayXrange = font.render(f'{round((displayTimeValue/1000)*savedinitial[0],1)}m', True, (255,255,255))
-displayXrange_rect = displayXrange.get_rect()
-displayXrange_rect.center = (baseBlankBox_rect.center[0],baseBlankBox_rect.center[1]+77)
 
 displayBounceCount = font.render(f'Bounces: {bounceCount}' , True, (255,255,255))
 displayBounceCount_rect = displayBounceCount.get_rect()
-displayBounceCount_rect.center = (baseBlankBox_rect.center[0],baseBlankBox_rect.center[1]+154)
-
-
+displayBounceCount_rect.center = (baseBlankBox_rect.center[0],baseBlankBox_rect.center[1]+77)
 
 
 displayfinal = False #bool value to show the final point
@@ -375,15 +362,14 @@ while running:
     #Information boxes of the motion in the top right, inside game loop so text can update
     displayBounceCount = font.render(f'Bounces: {bounceCount}' , True, (255,255,255)) 
     displayTime = font.render(f'{round(displayTimeValue/1000,1)}s', True, (255,255,255))
-    displayXrange = font.render(f'{round((displayTimeValue/1000)*savedinitial[0],1)}m', True, (255,255,255))
-    
+
     Restitution_text = font.render(displayRestitution, True, (255,255,255))
     Restitution_text_rect = Restitution_text.get_rect()
     Restitution_text_rect.center = (RestitutionButton_rect.center[0]+55,RestitutionButton_rect.center[1]+2)
     
     testText = font.render(str([round(x) for x in rawranges]), True, (255,255,255))
     slopeslist = [math.degrees(x.angle) for x in linesList]
-    testText = debugfont.render((f'{incomingCollision} {RawRangeOutliers}'), True, (255,255,255))
+    testText = debugfont.render((f'{Neworigins}'), True, (255,255,255))
 
 
     for event in pygame.event.get():
@@ -659,13 +645,17 @@ while running:
                 originpoints_rects.append(temprect)
 
             temprect = pygame.Rect(0,0,10,10)
+
             if incomingCollision:
                 temprect.center = (origin[0] + scale*NextCollisionXPoint-xshift,origin[1] - scale*NextCollisionYPoint - yshift)
                 finalpoint_rect = temprect
+                Neworigins.append(finalpoint_rect.center)
                 # print('yurrr')
             else:
                 temprect.center = (origin[0] + sum(ranges) - xshift, origin[1] - yshift)#im too lazy to correct this rn so do it pretty please 🥺, i dont know how to do this without getparabola
                 finalpoint_rect = temprect
+                Neworigins.append(finalpoint_rect.center)
+
             
             path = [[(scale*p[0][0],scale*p[0][1]), p[1]] for p in rawpath] #this is taken from the getpoint function in the motion class,the points are multiplied by the scale as it can be constantly changed index 1 is unused can be ignored. index 2 is the motion number label. not scale dependant but used so when drawing each circle it knows what origin it is relative to as there is a list of origins
             
@@ -679,30 +669,23 @@ while running:
             CollidingPoints = []
             for i,line in enumerate(linesList):
                 lineCollisionPoint = line.collisionCheck(Coeffs, originCartForm)
-                # if lineCollisionPoint:
-                #     Tolerance = 0.005
-                #     difference = abs(originCartForm[0] - lineCollisionPoint)
-                #     # print('difference', difference)
-                #     # print(originCartForm[0], lineCollisionPoint)
-                #     print(f'difference = {difference}, tolerance = {Tolerance}, collision = {lineCollisionPoint}, origin x point = {originCartForm[0]}, collidingpoints = {CollidingPoints}')
-                #     if difference > Tolerance:
-                #         print('collision detected')
-                #         CollidingPoints.append(lineCollisionPoint)
-                #         NextLineIndex = i
                 if lineCollisionPoint:
                     #hopefully when i did the thing like only giving the value that passes tolernace it doesnt make the point detection bad yk.
                     CollidingPoints.append(lineCollisionPoint)
                     NextLineIndex = i
-            # print(f'bounceCount {bounceCount}, {CollidingPoints}')
+            print(f'bounceCount {bounceCount}, {CollidingPoints}')
             CollidingPoints = sorted(CollidingPoints)
             if len(CollidingPoints) != 0:
-                incomingCollision = True
-                NextCollisionXPoint = CollidingPoints[0]
-                pygame.time.set_timer(landing, round(timeToReachX(initial,NextCollisionXPoint,originCartForm)*1000), 1)
-                print(f'timer for {round(timeToReachX(initial,NextCollisionXPoint,originCartForm)*1000)} ms has begun, {initial} and {NextCollisionXPoint}')
-                # NextCollisionYPoint = linesList[NextLineIndex].YValueFromXValue(NextCollisionXPoint)
-                NextCollisionYPoint = Coeffs[0]*(NextCollisionXPoint**2) + Coeffs[1]*NextCollisionXPoint + Coeffs[2]
-                print('Hit Point', NextCollisionXPoint, NextCollisionYPoint)
+                Condition1 = CollidingPoints[0] > originCartForm[0] and initial[0] > 0
+                Condition2 = CollidingPoints[0] < originCartForm[0] and initial[0] < 0
+                if Condition1 or Condition2:
+                    incomingCollision = True
+                    NextCollisionXPoint = CollidingPoints[0]
+                    pygame.time.set_timer(landing, round(timeToReachX(initial,NextCollisionXPoint,originCartForm)*1000), 1)
+                    print(f'timer for {round(timeToReachX(initial,NextCollisionXPoint,originCartForm)*1000)} ms has begun, {initial} and {NextCollisionXPoint}')
+                    # NextCollisionYPoint = linesList[NextLineIndex].YValueFromXValue(NextCollisionXPoint)
+                    NextCollisionYPoint = Coeffs[0]*(NextCollisionXPoint**2) + Coeffs[1]*NextCollisionXPoint + Coeffs[2]
+                    print('Hit Point', NextCollisionXPoint, NextCollisionYPoint)
             else:
                 incomingCollision = False
 
@@ -892,6 +875,7 @@ while running:
         # Neworigins.append( (sum(ranges),origin[1]) )
         displayfinal = True
         
+        
     if originstate:
         FireButton = FireButtonStates[0]
     elif all(boolListValues):
@@ -903,6 +887,7 @@ while running:
                 It is used so I can index the origins list and it will correctly use the correct offset when iterating through the path,
                 as each point in the path has a origin assigned it it
                 '''
+
                 pygame.draw.circle(screen, 'white', (Neworigins[p[1]][0] + p[0][0] - xshift,Neworigins[p[1]][1] - p[0][1] - yshift), 3)
             for i in range(len(ranges)): #iterates through ranges calculated. if the index is below the maxcount display all maxpoints. same for bounceCount and origins
                 if i < maxCount:
@@ -914,28 +899,27 @@ while running:
                     # pygame.draw.circle(screen, 'red', (Neworigins[i][0]-xshift,Neworigins[i][1]-yshift), 5)
 
             if displayfinal:
-                pygame.draw.circle(screen, 'brown', finalpoint_rect.center, 5)
+                pygame.draw.circle(screen, 'brown', Neworigins[-1], 5)
 
         if not showtrail:
             '''
             if not showing trail, the entire path does not need to be kept track of, so I can just calculate the point at the exact current time,
             indexing origins with the bounceCount as the bounceCount cannot go down as I wouldnt need to render any past motions.
             '''
-            currentpos = currentpoint(initial, totalT, g)
-            pygame.draw.circle(screen, 'white', (Neworigins[bounceCount][0] + currentpos[0]*scale - xshift,Neworigins[bounceCount][1] - currentpos[1]*scale - yshift), 3)
-            # pygame.draw.circle(screen, 'white', (Neworigins[bounceCount][0] +  currentpos[0]*scale - xshift,Neworigins[bounceCount][1] - currentpos[1]*scale - yshift), 3)
-
+            if not displayfinal:
+                currentpos = currentpoint(initial, totalT, g)
+                pygame.draw.circle(screen, 'white', (Neworigins[bounceCount][0] + currentpos[0]*scale - xshift,Neworigins[bounceCount][1] - currentpos[1]*scale - yshift), 3)
+            else:
+                pygame.draw.circle(screen, 'white', (Neworigins[-1][0], Neworigins[-1][1]), 3)
     pygame.draw.circle(screen, 'red', (origin[0]-xshift,origin[1]-yshift), 5) # True Origin
 
     if not HideUI:
         #information boxes in top right
         screen.blit(BlankBox,baseBlankBox_rect)
         screen.blit(BlankBox,(baseBlankBox_rect[0],baseBlankBox_rect[1]+77))
-        screen.blit(BlankBox,(baseBlankBox_rect[0],baseBlankBox_rect[1]+154))
         
         #information values in top right
         screen.blit(displayTime,displayTime_rect) 
-        screen.blit(displayXrange,displayXrange_rect)
         screen.blit(displayBounceCount,displayBounceCount_rect)
         
         #buttons for user and their values
@@ -992,7 +976,7 @@ while running:
 
             if displayfinal:
                 if finalpoint_rect.collidepoint(pygame.mouse.get_pos()):
-                    finalpoint_Cart = pixelToCart(finalpoint_rect.center, xshift, yshift, scale)
+                    finalpoint_Cart = pixelToCart(Neworigins[-1], xshift, yshift, scale)
                     finalpointText = font.render(f'({round(finalpoint_Cart[0],1)},{round(finalpoint_Cart[1],1)})m', True, (68,71,187))
 
                     finalpoint_rect.center = (finalpoint_rect.center[0], finalpoint_rect.center[1]-45)
