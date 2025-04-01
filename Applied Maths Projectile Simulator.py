@@ -12,15 +12,15 @@ Countless tests on paper of the motions were performed by myself while coding th
 
 ##errors / to-do
 '''
-display info values for range do not exactly match the final point coordinates when displayed, possibly deltaTime issue.
+display info values for range do not exactly match the final point coordinates when displayed, possibly deltaTime issue. its also def incrorect now cos it can move in all sorts of directions
 
 dont forget about vertical lines
 there is a unknown random value being appended to origins at the end of motions with bounce, too tired to deal with it rn and its not bothering me
 hovering over points that touch the floor display a y distance as -0.0 how awesome 🤩🤩
 when showtrail is off the point lies at the last origin instead of the final point at the end of a motion
 it still randomly does the thing where it hits something and it just stops - my theory is cos it hits it and its a vert wall so i need to code the new state,
+timer for hitting the bottom of a line is incredibly wrong and it just goes through the gorund
 '''
-
 
 pygame.init()
 wh = pygame.display.get_desktop_sizes()[0]
@@ -47,7 +47,7 @@ debugfont = pygame.font.Font('freesansbold.ttf', 16)
 
 
 e = 1/2 #value for restitution, denoted with e in applied maths
-displayRestitution = ('1/2') #string of value for e for 
+displayRestitution = ('1/2') #string of value for e
 
 def time(init): #gets the time of a single motion
     return (init[1]) / (4.9)
@@ -134,6 +134,8 @@ HideButton_rect = HideButton.get_rect(topleft=(0,0))
 HideUI = False
 
 
+
+
 #custom event for when the projectile lands. (called when the time of the current motion elapses)
 landing = pygame.event.custom_type()
 
@@ -218,6 +220,7 @@ displayBounceCount_rect.center = (baseBlankBox_rect.center[0],baseBlankBox_rect.
 
 
 
+
 displayfinal = False #bool value to show the final point
 hoveringMax = False #if hovering over a maximum point
 hoveringOrigin = False #if hovering over an origin point
@@ -274,7 +277,8 @@ class Line:
             yVal = Coefficients[0]*(xVal**2) + Coefficients[1]*xVal + Coefficients[2]
             Restriction = sorted([self.pointA[1],self.pointB[1]])
             if yVal >= Restriction[0] and yVal <= Restriction[1]:
-                return xVal
+                if ToleranceCheck(origin[0], xVal):
+                    return xVal
         else:
             intersectionXValues = QuadraticSolver(Coefficients[0], Coefficients[1] - self.slope, Coefficients[2] - self.yIntercept)
             Restriction = sorted([self.pointA[0],self.pointB[0]])
@@ -433,6 +437,8 @@ while running:
                 incomingCollision = False
                 linesList = []
                 CollidingPoints = []
+                points_rects = []
+                originpoints_rects = []
 
 
                 
@@ -634,7 +640,7 @@ while running:
             if incomingCollision:
                 currentOriginCartForm = pixelToCart(Neworigins[bounceCount],xshift,yshift,scale)
                 RawRangeOutliers[bounceCount] = NextCollisionXPoint - currentOriginCartForm[0]
-                print(f'I append this to raw range outliers cos im a fucking stupid computer {RawRangeOutliers}')
+                # print(f'I append this to raw range outliers cos im a fucking stupid computer {RawRangeOutliers}')
                 CollisionOriginPoints[bounceCount+1] = (NextCollisionXPoint, NextCollisionYPoint)
             
 
@@ -656,8 +662,9 @@ while running:
             if incomingCollision:
                 temprect.center = (origin[0] + scale*NextCollisionXPoint-xshift,origin[1] - scale*NextCollisionYPoint - yshift)
                 finalpoint_rect = temprect
+                # print('yurrr')
             else:
-                temprect.center = (origin[0] + sum(ranges) - xshift, origin[1] - yshift)#im too lazy to correct this rn so do it pretty please 🥺
+                temprect.center = (origin[0] + sum(ranges) - xshift, origin[1] - yshift)#im too lazy to correct this rn so do it pretty please 🥺, i dont know how to do this without getparabola
                 finalpoint_rect = temprect
             
             path = [[(scale*p[0][0],scale*p[0][1]), p[1]] for p in rawpath] #this is taken from the getpoint function in the motion class,the points are multiplied by the scale as it can be constantly changed index 1 is unused can be ignored. index 2 is the motion number label. not scale dependant but used so when drawing each circle it knows what origin it is relative to as there is a list of origins
@@ -786,19 +793,17 @@ while running:
                     initial = (e*FinalVelocity[0],e*FinalVelocity[1])
                     magnitude = math.sqrt(initial[0]**2 + initial[1]**2)
                     direction = abs(math.degrees(math.atan2(initial[1],initial[0])))
-                    teststring = f'{SlopeOfSurface}'
                     
                     a = Coeffs[0]
                     b = Coeffs[1]
                     TangentSlope = (2*a*NextCollisionXPoint+b)
 
                     if linesList[NextLineIndex].slope < TangentSlope and initial[0] > 0:
-                        newdirection = direction - (direction - SlopeOfSurface) - (direction - SlopeOfSurface)
-                        # print('using the other formula 😡', bounceCount)
+                        newdirection = 2*SlopeOfSurface - direction
                     else:
                         newdirection = direction + 2*SlopeOfSurface
                     initial = (magnitude*math.cos(math.radians(newdirection)),magnitude*math.sin(math.radians(newdirection)))
-                else:
+                else:       
                     CartFormOrigin = pixelToCart(Neworigins[bounceCount], xshift, yshift, scale)
                     tValues = QuadraticSolver( ((-1/2)*g), (initial[1]), (CartFormOrigin[1]))
                     if tValues[0] > 0:
@@ -817,7 +822,7 @@ while running:
 
                 incomingCollision = False
 
-                if abs(initial[1]) < 1:
+                if abs(initial[1]) < 0.5:
                     #caps the y-value. When the Y-velocity is uncapped because its being reduced by a fraction therefore it can never reach 0. therefore infinite bounces.
                     #this only happens in this simulation as it cannot truly account for every acting force on a real particle
                     simulating = False
