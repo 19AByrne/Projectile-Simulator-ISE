@@ -589,9 +589,7 @@ while running:
                 RawRangeOutliers[bounceCount] = NextCollisionXPoint - currentOriginCartForm[0]
                 CollisionOriginPoints[bounceCount+1] = (NextCollisionXPoint, NextCollisionYPoint)
             
-
             maxpoints = [(scale*xrange(init)/2 + Neworigins[i][0] - xshift, Neworigins[i][1] - scale*maxheight(init)- yshift) for i,init in enumerate(initials)] #updates list of maxheights for every initial
-
 
             #creating rects for important points to be highlighted
             points_rects = []
@@ -612,11 +610,12 @@ while running:
                 finalpoint_rect = temprect
                 Neworigins.append(finalpoint_rect.center)
             else:
-                temprect.center = (origin[0] + sum(ranges) - xshift, origin[1] - yshift)#im too lazy to correct this rn so do it pretty please 🥺, i dont know how to do this without getparabola
+                temprect.center = (origin[0] + sum(ranges) - xshift, origin[1] - yshift)
                 finalpoint_rect = temprect
                 Neworigins.append(finalpoint_rect.center)
-
-            #this is taken from the getpoint function in the motion class,the points are multiplied by the scale as it can be constantly changed. index 1 is the motion number label. not scale dependant but used so when drawing each circle it knows what origin it is relative to as there is a list of origins
+                
+            '''this is taken from the getpoint function in the motion class,the points are multiplied by the scale as it can be constantly changed. 
+            index 1 is the motion number label. not scale dependant but used so when drawing each circle it knows what origin it is relative to as there is a list of origins'''
             path = [[(scale*p[0][0],scale*p[0][1]), p[1]] for p in rawpath] 
 
         if event.type == GetParabola and len(rawranges) != 0:
