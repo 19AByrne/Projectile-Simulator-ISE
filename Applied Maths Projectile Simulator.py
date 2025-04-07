@@ -758,7 +758,6 @@ while running:
     if originstate:
         FireButton = FireButtonStates[0]
     elif all(boolListValues):
-        #Y-value for coordinates of origin points will always be the same as the True Origin points y-value, allowing me to call origin[1]
         if showtrail:
             for p in path[:-1]: #Filtering out latest point in list as it cannot be scaled fast enough
                 '''
@@ -766,7 +765,6 @@ while running:
                 It is used so I can index the origins list and it will correctly use the correct offset when iterating through the path,
                 as each point in the path has a origin assigned it it
                 '''
-
                 pygame.draw.circle(screen, 'white', (Neworigins[p[1]][0] + p[0][0] - xshift,Neworigins[p[1]][1] - p[0][1] - yshift), 3)
             for i in range(len(ranges)): #iterates through ranges calculated. if the index is below the maxcount display all maxpoints. same for bounceCount and origins
                 if i < maxCount:
@@ -774,7 +772,6 @@ while running:
 
                 if i <= bounceCount:
                     pygame.draw.circle(screen, 'blue', (Neworigins[i][0]-xshift,Neworigins[i][1]-yshift), 5)
-                    # pygame.draw.circle(screen, 'red', (Neworigins[i][0]-xshift,Neworigins[i][1]-yshift), 5)
 
             if displayfinal:
                 pygame.draw.circle(screen, 'brown', Neworigins[-1], 5)
@@ -860,10 +857,6 @@ while running:
                     finalpoint_rect.center = (finalpoint_rect.center[0], finalpoint_rect.center[1]-45)
                     screen.blit(finalpointText, finalpoint_rect)
                     
-            # if hoveringMax or hoveringOrigin:
-            #     screen.blit(hoverpostext[0],(hoverpostext[1][0], hoverpostext[1][1]-45))
-
-    # screen.blit(testText,(width/6, height/2))
     screen.blit(HideButton,HideButton_rect)
     pygame.display.flip()
     clock.tick(144)  # fps limit
